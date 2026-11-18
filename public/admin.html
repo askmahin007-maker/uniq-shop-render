@@ -28,6 +28,21 @@ async function uploadImgs(id,inp){ let p=PRODUCTS.find(x=>x.id===id); let files=
 async function setOrder(id,s){ await api('/api/admin/orders/'+id,{method:'PUT',body:JSON.stringify({status:s})}); await refresh(); render(); } async function delOrder(id){ if(!confirm('Delete?'))return; await api('/api/admin/orders/'+id,{method:'DELETE'}); await refresh(); render(); }
 async function addFaq(){ let q=document.getElementById('faqQ').value, a=document.getElementById('faqA').value; if(!q||!a)return; await api('/api/admin/faqs',{method:'POST',body:JSON.stringify({q,a})}); await refresh(); render(); } async function delFaq(i){ await api('/api/admin/faqs/'+i,{method:'DELETE'}); await refresh(); render(); }
 async function delFb(id){ await api('/api/admin/feedbacks/'+id,{method:'DELETE'}); await refresh(); render(); }
-async function saveSettings(){ let body={chatNumber:document.getElementById('setChat').value, contactTime:document.getElementById('setTime').value}; let np=document.getElementById('setPass').value.trim(); if(np) body.adminKey=np; await api('/api/admin/settings',{method:'POST',body:JSON.stringify(body)}); if(np){ KEY=np; localStorage.setItem('uniq_admin_key',np); } await refresh(); render(); alert('✅ Settings Save Hoise - Chat Number + Password 2 tai update hoise'); }
+async function saveSettings(){
+  let body={ chatNumber: document.getElementById('setChat').value, contactTime: document.getElementById('setTime').value };
+  let np = document.getElementById('setPass').value.trim();
+  if(np){
+    if(np.length < 4){ alert('Password kompokkhe 4 okkhor hote hobe'); return; }
+    body.adminKey = np;
+  } else {
+    alert('Password er ghore notun password likho, khali rakhle bodlabe na!');
+    return;
+  }
+  await api('/api/admin/settings',{method:'POST',body:JSON.stringify(body)});
+  KEY = np;
+  localStorage.setItem('uniq_admin_key', np);
+  alert('✅ Password Bodle Gese! Ekhon notun password diye login korte hobe: ' + np);
+  location.reload();
+}
 if(KEY) init();
 </script></body></html>
