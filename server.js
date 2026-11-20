@@ -27,11 +27,11 @@ app.get('/api/data', async (req,res)=>{
       getTable('reviews'), getTable('feedbacks'), getTable('faqs'), getTable('stock_alerts')
     ]);
     const settings = await getSettings();
-    // products ke ager format e firano
+    // FIX 1: null ar thakbe na - sob default deya
     const p2 = products.map(p=>({
-      id: p.id, name: p.name, cat: p.cat, price: p.price, old: p.old, stock: p.stock,
-      rating: p.rating, badge: p.badge, emoji: p.emoji,
-      desc: p.description||'', images: p.images||[], variants: p.variants||[]
+      id: p.id, name: p.name || 'Product', cat: p.cat || 'Fashion', price: p.price || 0, old: p.old || 0, stock: p.stock || 0,
+      rating: p.rating || 4.8, badge: p.badge || '', emoji: p.emoji || '📦',
+      desc: p.description || p.desc || '', images: p.images || [], variants: p.variants || []
     }));
     res.json({products:p2, orders, users, reviews, feedbacks, faqs, stock_alerts, settings});
   }catch(e){ res.status(500).json({error:e.message}); }
@@ -71,26 +71,31 @@ app.post('/api/settings', async (req,res)=>{
   res.json(data);
 });
 
-// --- Website Serve --- 
-// index.html koi ase khuje ber korbe
+// --- Website Serve - Shop Alada, Admin Alada --- 
 function getIndexPath(){
   if(fs.existsSync(path.join(__dirname,'index.html'))) return path.join(__dirname,'index.html');
   if(fs.existsSync(path.join(__dirname,'public','index.html'))) return path.join(__dirname,'public','index.html');
   return path.join(__dirname,'index.html');
+}
+function getAdminPath(){
+  if(fs.existsSync(path.join(__dirname,'admin.html'))) return path.join(__dirname,'admin.html');
+  if(fs.existsSync(path.join(__dirname,'public','admin.html'))) return path.join(__dirname,'public','admin.html');
+  return path.join(__dirname,'admin.html');
 }
 
 app.get('/debug', (req,res)=> {
   res.json({ 
     files: fs.readdirSync(__dirname), 
     has_index_root: fs.existsSync(path.join(__dirname,'index.html')),
-    has_index_public: fs.existsSync(path.join(__dirname,'public','index.html'))
+    has_admin: fs.existsSync(path.join(__dirname,'admin.html'))
   });
 });
 
-app.get('/admin', (req,res)=> res.sendFile(getIndexPath()));
+// FIX 2: Admin ekhon alada!
+app.get('/admin', (req,res)=> res.sendFile(getAdminPath()));
+app.get('/admin.html', (req,res)=> res.sendFile(getAdminPath()));
 app.get('/', (req,res)=> res.sendFile(getIndexPath()));
 app.get('*', (req,res)=> {
-  // api hole 404, baki sob website e pathao
   if(req.path.startsWith('/api/')) return res.status(404).json({error:'Not Found'});
   res.sendFile(getIndexPath());
 });
