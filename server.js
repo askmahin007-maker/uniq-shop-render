@@ -19,7 +19,7 @@ async function getSettings(){
   return data?.data || {};
 }
 
-// Frontend er jonno sob data eksathe
+// Frontend er jonno sob data eksathe - SHOP er jonno
 app.get('/api/data', async (req,res)=>{
   try{
     const [products, orders, users, reviews, feedbacks, faqs, stock_alerts] = await Promise.all([
@@ -27,7 +27,6 @@ app.get('/api/data', async (req,res)=>{
       getTable('reviews'), getTable('feedbacks'), getTable('faqs'), getTable('stock_alerts')
     ]);
     const settings = await getSettings();
-    // FIX 1: null ar thakbe na - sob default deya
     const p2 = products.map(p=>({
       id: p.id, name: p.name || 'Product', cat: p.cat || 'Fashion', price: p.price || 0, old: p.old || 0, stock: p.stock || 0,
       rating: p.rating || 4.8, badge: p.badge || '', emoji: p.emoji || '📦',
@@ -71,6 +70,76 @@ app.post('/api/settings', async (req,res)=>{
   res.json(data);
 });
 
+// --- Admin.html er jonno missing API ---
+
+// 1. Admin Login Check
+app.post('/api/check-admin', async (req,res)=>{
+  const s = await getSettings();
+  const key = s.adminKey || 'admin123';
+  res.json({ok: req.body.key === key});
+});
+
+// 2. Admin ja chay - alada alada data
+app.get('/api/products', async (req,res)=>{
+  const products = await getTable('products');
+  res.json(products.map(p=>({
+    id:p.id, name:p.name, cat:p.cat||'Fashion', price:p.price||0, old:p.old||0, stock:p.stock||0,
+    rating:p.rating||4.8, badge:p.badge||'', emoji:p.emoji||'📦',
+    desc:p.description||'', images:p.images||[], variants:p.variants||[]
+  })));
+});
+app.get('/api/faqs', async (req,res)=> res.json(await getTable('faqs')));
+app.get('/api/settings', async (req,res)=> res.json(await getSettings()));
+
+// 3. Admin Orders - Shop er format e
+app.get('/api/admin/orders', async (req,res)=>{
+  const orders = await getTable('orders');
+  res.json(orders.map(o=>({
+    id:o.id, orderId:o.orderid||('ORD-'+o.id), name:o.customer_name||o.name, phone:o.customer_phone||o.phone,
+    address:o.shipping_address||o.address, items:o.items, total:o.total_amount||o.total||0,
+    status:o.status||'Pending', date:o.created_at||o.date, payment:o.payment_method||o.payment, trxid:o.trxid
+  })));
+});
+app.get('/api/admin/feedbacks', async (req,res)=> res.json(await getTable('feedbacks')));
+
+// 4. Admin Product Save / Update / Delete
+app.post('/api/admin/products', async (req,res)=>{
+  const b=req.body;
+  const row={name:b.name, cat:b.cat||'Fashion', price:b.price||0, old:b.old||0, stock:b.stock||0, rating:b.rating||4.8, badge:b.badge||'', emoji:b.emoji||'📦', description:b.desc||'', images:b.images||[], variants:b.variants||[]};
+  const {data}=await supabase.from('products').insert(row).select().single();
+  res.json(data||{ok:true});
+});
+app.put('/api/admin/products/:id', async (req,res)=>{
+  const b=req.body; const row={};
+  if(b.name) row.name=b.name; if(b.price!==undefined) row.price=b.price; if(b.stock!==undefined) row.stock=b.stock;
+  if(b.cat) row.cat=b.cat; if(b.desc!==undefined) row.description=b.desc;
+  await supabase.from('products').update(row).eq('id',req.params.id);
+  res.json({ok:true});
+});
+app.delete('/api/admin/products/:id', async (req,res)=>{
+  await supabase.from('products').delete().eq('id',req.params.id); res.json({ok:true});
+});
+
+// 5. Admin Order Update / Delete
+app.put('/api/admin/orders/:id', async (req,res)=>{
+  await supabase.from('orders').update({status:req.body.status}).eq('id',req.params.id);
+  res.json({ok:true});
+});
+app.delete('/api/admin/orders/:id', async (req,res)=>{
+  await supabase.from('orders').delete().eq('id',req.params.id); res.json({ok:true});
+});
+app.delete('/api/admin/feedbacks/:id', async (req,res)=>{
+  await supabase.from('feedbacks').delete().eq('id',req.params.id); res.json({ok:true});
+});
+
+// 6. Admin Settings Save - ager settings er sathe merge
+app.post('/api/admin/settings', async (req,res)=>{
+  const old = await getSettings();
+  const merged = {...old, ...req.body};
+  const {data} = await supabase.from('settings').upsert({id:1, data:merged}).select().single();
+  res.json(data);
+});
+
 // --- Website Serve - Shop Alada, Admin Alada --- 
 function getIndexPath(){
   if(fs.existsSync(path.join(__dirname,'index.html'))) return path.join(__dirname,'index.html');
@@ -91,7 +160,6 @@ app.get('/debug', (req,res)=> {
   });
 });
 
-// FIX 2: Admin ekhon alada!
 app.get('/admin', (req,res)=> res.sendFile(getAdminPath()));
 app.get('/admin.html', (req,res)=> res.sendFile(getAdminPath()));
 app.get('/', (req,res)=> res.sendFile(getIndexPath()));
