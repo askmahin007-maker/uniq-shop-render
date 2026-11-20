@@ -1,1 +1,117 @@
-{"products":[],"orders":[],"feedbacks":[],"faqs":[],"settings":{"chatNumber":"01816314494","contactTime":"প্রতিদিন সকাল ৯টা - রাত ৯টা","adminKey":"admin123"}}
+{
+  "products": [
+    {
+      "id": 1,
+      "name": "Panjabi - Premium Cotton",
+      "cat": "Fashion",
+      "price": 1300,
+      "old": 1500,
+      "stock": 50,
+      "rating": 4.8,
+      "badge": "🔥 Best Seller",
+      "isNew": false,
+      "emoji": "👕",
+      "desc": "Premium cotton panjabi. Aramdayok, original.",
+      "highlights": ["100% অরিজিনাল পণ্য", "৭ দিনের রিটার্ন সুবিধা"],
+      "images": ["https://images.unsplash.com/photo-1597983073493-88cd35cf93b0?w=800"],
+      "variants": [
+        { "color": "White", "name": "White", "size": "M", "stock": 20, "price": 1300 },
+        { "color": "White", "name": "White", "size": "L", "stock": 15, "price": 1300 },
+        { "color": "Black", "name": "Black", "size": "M", "stock": 15, "price": 1300 }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Summer Cotton T-Shirt",
+      "cat": "Summer",
+      "price": 488,
+      "old": 650,
+      "stock": 18,
+      "rating": 4.8,
+      "badge": "",
+      "isNew": false,
+      "emoji": "👕",
+      "desc": "Summer er jonno best cotton t-shirt.",
+      "highlights": ["100% Cotton"],
+      "images": ["https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=800"],
+      "variants": [
+        { "color": "Red", "name": "Red", "size": "L", "stock": 10, "price": 488 },
+        { "color": "Black", "name": "Black", "size": "XL", "stock": 8, "price": 520 }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "Winter Hoodie Premium",
+      "cat": "Winter",
+      "price": 1150,
+      "old": 1450,
+      "stock": 25,
+      "rating": 4.8,
+      "badge": "",
+      "isNew": false,
+      "emoji": "🧥",
+      "desc": "Warm premium hoodie.",
+      "highlights": ["Warm & Soft"],
+      "images": ["https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=800"],
+      "variants": []
+    },
+    {
+      "id": 4,
+      "name": "Wireless Earbuds Pro",
+      "cat": "Electronics",
+      "price": 1450,
+      "old": 1850,
+      "stock": 20,
+      "rating": 4.9,
+      "badge": "🔥 Best Seller",
+      "isNew": false,
+      "emoji": "🎧",
+      "desc": "Original earbuds.",
+      "highlights": ["Bluetooth 5.3"],
+      "images": ["https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=800"],
+      "variants": []
+    },
+    {
+      "id": 5,
+      "name": "Winter Styles Clothes",
+      "cat": "Winter",
+      "price": 1050,
+      "old": 1300,
+      "stock": 50,
+      "rating": 4.8,
+      "badge": "✨ New",
+      "isNew": true,
+      "emoji": "🧥",
+      "desc": "Winter Styles Clothes - Premium Cotton Best",
+      "highlights": ["Premium Quality", "Cash on Delivery"],
+      "images": ["https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=800"],
+      "variants": []
+    }
+  ],
+  "orders": [],
+  "feedbacks": [],
+  "faqs": [
+    { "q": "Delivery koto din e pabo?", "a": "Dhaka te 1-2 din, Dhaka-r baire 2-4 din." },
+    { "q": "Cash on Delivery ase?", "a": "Ha! Pura Bangladesh e Cash on Delivery." },
+    { "q": "Return kora jabe?", "a": "Ha, 7 diner vitore problem thakle return kora jabe." },
+    { "q": "bKash e payment kora jabe?", "a": "Ha, bKash / Nagad / Cash - 3 tai hobe." }
+  ],
+  "settings": {
+    "chatNumber": "01816314494",
+    "contactTime": "প্রতিদিন সকাল ৯টা - রাত ৯টা",
+    "adminKey": "admin123",
+    "bkashNumber": "01816314494",
+    "shopName": "UNIQ SHOP",
+    "deliveryDhaka": 60,
+    "deliveryOutside": 130,
+    "freeAbove": 2000,
+    "deliveryTime": "Dhaka te 24h, Baire 2-3 din",
+    "coupons": [
+      { "code": "UNIQ10", "off": 10, "active": true },
+      { "code": "EID20", "off": 20, "active": true }
+    ]
+  },
+  "users": [],
+  "reviews": [],
+  "stockAlerts": []
+}
