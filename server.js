@@ -1,12 +1,14 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 app.use(cors());
 app.use(express.json({limit:'10mb'}));
 app.use(express.static(__dirname));
+app.use(express.static(path.join(__dirname, 'public')));
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 
@@ -69,6 +71,29 @@ app.post('/api/settings', async (req,res)=>{
   res.json(data);
 });
 
-app.get('/', (req,res)=> res.sendFile(path.join(__dirname,'index.html')));
+// --- Website Serve --- 
+// index.html koi ase khuje ber korbe
+function getIndexPath(){
+  if(fs.existsSync(path.join(__dirname,'index.html'))) return path.join(__dirname,'index.html');
+  if(fs.existsSync(path.join(__dirname,'public','index.html'))) return path.join(__dirname,'public','index.html');
+  return path.join(__dirname,'index.html');
+}
+
+app.get('/debug', (req,res)=> {
+  res.json({ 
+    files: fs.readdirSync(__dirname), 
+    has_index_root: fs.existsSync(path.join(__dirname,'index.html')),
+    has_index_public: fs.existsSync(path.join(__dirname,'public','index.html'))
+  });
+});
+
+app.get('/admin', (req,res)=> res.sendFile(getIndexPath()));
+app.get('/', (req,res)=> res.sendFile(getIndexPath()));
+app.get('*', (req,res)=> {
+  // api hole 404, baki sob website e pathao
+  if(req.path.startsWith('/api/')) return res.status(404).json({error:'Not Found'});
+  res.sendFile(getIndexPath());
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, ()=> console.log('Running on '+PORT));
