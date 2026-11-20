@@ -13,13 +13,16 @@ app.use(express.static(path.join(__dirname, 'public')));
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 
 // --- Helpers ---
-async function getTable(t){ const {data} = await supabase.from(t).select('*'); return data||[]; }
+async function getTable(t){ const {data} = await supabase.from(t).select('*').order('id',{ascending:false}); return data||[]; }
 async function getSettings(){
   const {data} = await supabase.from('settings').select('*').eq('id',1).single();
   return data?.data || {};
 }
+function cleanPhone(p){ let c=String(p||'').replace(/[^0-9]/g,''); return c; }
+function mapProduct(p){ return { id:p.id, name:p.name||'Product', cat:p.cat||'Fashion', price:p.price||0, old:p.old||0, stock:p.stock||0, rating:p.rating||4.8, badge:p.badge||'', emoji:p.emoji||'📦', desc:p.description||p.desc||'', images:p.images||[], variants:p.variants||[] }; }
+function mapOrder(o){ return { id:o.id, orderId:o.orderid||o.orderId||('ORD-'+o.id), name:o.customer_name||o.name||'', phone:o.customer_phone||o.phone||'', address:o.shipping_address||o.address||'', items:o.items||'', total:o.total_amount||o.total||0, status:o.status||'Pending', date:o.created_at||o.date||'', payment:o.payment_method||o.payment||'COD', trxid:o.trxid||o.trxId||'', trxId:o.trxid||o.trxId||'' }; }
 
-// Frontend er jonno sob data eksathe - SHOP er jonno
+// --- SHOP DATA ---
 app.get('/api/data', async (req,res)=>{
   try{
     const [products, orders, users, reviews, feedbacks, faqs, stock_alerts] = await Promise.all([
@@ -27,37 +30,103 @@ app.get('/api/data', async (req,res)=>{
       getTable('reviews'), getTable('feedbacks'), getTable('faqs'), getTable('stock_alerts')
     ]);
     const settings = await getSettings();
-    const p2 = products.map(p=>({
-      id: p.id, name: p.name || 'Product', cat: p.cat || 'Fashion', price: p.price || 0, old: p.old || 0, stock: p.stock || 0,
-      rating: p.rating || 4.8, badge: p.badge || '', emoji: p.emoji || '📦',
-      desc: p.description || p.desc || '', images: p.images || [], variants: p.variants || []
-    }));
-    res.json({products:p2, orders, users, reviews, feedbacks, faqs, stock_alerts, settings});
+    res.json({products:products.map(mapProduct), orders:orders.map(mapOrder), users, reviews, feedbacks, faqs, stock_alerts, settings});
   }catch(e){ res.status(500).json({error:e.message}); }
 });
 
-// Product Save / Update
+// --- SHOP: Products ---
+app.get('/api/products', async (req,res)=>{ const p=await getTable('products'); res.json(p.map(mapProduct)); });
 app.post('/api/products', async (req,res)=>{
   const b = req.body;
-  const row = {
-    name:b.name, cat:b.cat||'Fashion', price:b.price||0, old:b.old||0,
-    stock:b.stock||0, rating:b.rating||4.8, badge:b.badge||'', emoji:b.emoji||'📦',
-    description:b.desc||b.description||'', images:b.images||[], variants:b.variants||[]
-  };
+  const row = { name:b.name, cat:b.cat||'Fashion', price:b.price||0, old:b.old||0, stock:b.stock||0, rating:b.rating||4.8, badge:b.badge||'', emoji:b.emoji||'📦', description:b.desc||b.description||'', images:b.images||[], variants:b.variants||[] };
   let r;
   if(b.id){ r = await supabase.from('products').update(row).eq('id',b.id).select().single(); }
   else{ r = await supabase.from('products').insert(row).select().single(); }
   res.json(r.data||{error:r.error});
 });
-app.delete('/api/products/:id', async (req,res)=>{
-  await supabase.from('products').delete().eq('id',req.params.id);
-  res.json({ok:true});
+app.delete('/api/products/:id', async (req,res)=>{ await supabase.from('products').delete().eq('id',req.params.id); res.json({ok:true}); });
+
+// --- SHOP: FAQs / Settings / Reviews GET ---
+app.get('/api/faqs', async (req,res)=> res.json(await getTable('faqs')));
+app.get('/api/settings', async (req,res)=> res.json(await getSettings()));
+app.get('/api/reviews', async (req,res)=> res.json(await getTable('reviews')));
+
+// --- SHOP: ORDERS - Frontend ja chay tai dibe ---
+app.post('/api/orders', async (req,res)=>{
+  try{
+    const b=req.body;
+    const orderId='UNIQ-'+Math.random().toString(36).slice(2,8).toUpperCase();
+    const row={ orderid:orderId, customer_name:b.name, customer_phone:cleanPhone(b.phone), shipping_address:b.address, items:b.items, total_amount:Number(b.total)||0, total:Number(b.total)||0, status:'Pending', payment_method:b.payment||'COD', payment:b.payment||'COD', trxid:b.trxId||b.trxid||'', name:b.name, phone:cleanPhone(b.phone), address:b.address };
+    const {data,error}=await supabase.from('orders').insert(row).select().single();
+    if(error) return res.json({ok:false,msg:error.message});
+    res.json({ok:true, order:mapOrder(data)});
+  }catch(e){ res.json({ok:false,msg:e.message}); }
 });
 
-// Generic Save - orders, users, reviews, feedbacks, faqs, stock_alerts
+// --- SHOP: Reviews POST ---
+app.post('/api/reviews', async (req,res)=>{
+  try{
+    const b=req.body;
+    const row={ name:b.name, phone:b.phone||'', productId:b.productId||'', product_id:b.productId||'', product:b.product||'', rating:Number(b.rating)||5, text:b.text||b.comment||'', img:b.img||'', created_at:new Date().toISOString() };
+    const {data,error}=await supabase.from('reviews').insert(row).select().single();
+    if(error) return res.json({ok:false,msg:error.message});
+    res.json({ok:true, review:data});
+  }catch(e){ res.json({ok:false,msg:e.message}); }
+});
+
+// --- SHOP: Signup / Login / My Orders / Track ---
+app.post('/api/signup', async (req,res)=>{
+  try{
+    const b=req.body;
+    const {data:ex}=await supabase.from('users').select('*').eq('phone',cleanPhone(b.phone)).single();
+    if(ex) return res.json({ok:false,msg:'Ei number diye account ase! Login koro'});
+    const row={ name:b.name, phone:cleanPhone(b.phone), password:b.password, address:b.address||'' };
+    const {data,error}=await supabase.from('users').insert(row).select().single();
+    if(error) return res.json({ok:false,msg:error.message});
+    res.json({ok:true, user:{id:data.id,name:data.name,phone:data.phone,address:data.address}});
+  }catch(e){ res.json({ok:false,msg:e.message}); }
+});
+app.post('/api/login', async (req,res)=>{
+  try{
+    const {data}=await supabase.from('users').select('*').eq('phone',cleanPhone(req.body.phone)).eq('password',req.body.password).single();
+    if(!data) return res.json({ok:false,msg:'Phone / Password vul!'});
+    res.json({ok:true, user:{id:data.id,name:data.name,phone:data.phone,address:data.address}});
+  }catch(e){ res.json({ok:false,msg:'Phone / Password vul!'}); }
+});
+app.get('/api/my-orders', async (req,res)=>{
+  const phone=cleanPhone(req.query.phone||'');
+  const orders=await getTable('orders');
+  const mine=orders.filter(o=>cleanPhone(o.customer_phone||o.phone||'')===phone || (o.customer_phone||o.phone||'').includes(phone.slice(-10)));
+  res.json(mine.map(mapOrder));
+});
+app.get('/api/track-order', async (req,res)=>{
+  const phone=cleanPhone(req.query.phone||''); const oid=String(req.query.orderId||'').toUpperCase();
+  const orders=await getTable('orders');
+  const o=orders.find(x=>(x.orderid||'').toUpperCase()===oid && cleanPhone(x.customer_phone||x.phone||'').includes(phone.slice(-10)));
+  if(!o) return res.json({ok:false,msg:'Order pawa jay nai! Phone + Order ID thik dao'});
+  res.json({ok:true, order:mapOrder(o)});
+});
+
+// --- SHOP: Feedback (singular + plural 2 tai) / Stock Alert ---
+app.post('/api/feedback', async (req,res)=>{
+  const b=req.body;
+  const {data}=await supabase.from('feedbacks').insert({name:b.name||'Guest', text:b.text||'', rating:5}).select().single();
+  res.json({ok:true, feedback:data});
+});
+app.post('/api/feedbacks', async (req,res)=>{
+  const {data}=await supabase.from('feedbacks').insert(req.body).select().single();
+  res.json({ok:true, feedback:data});
+});
+app.post('/api/stock-alert', async (req,res)=>{
+  const b=req.body;
+  const {data}=await supabase.from('stock_alerts').insert({phone:cleanPhone(b.phone), productId:b.productId||'', product:b.product||''}).select().single();
+  res.json({ok:true, alert:data});
+});
+
+// --- Generic (baki table er jonno) ---
 app.post('/api/:table', async (req,res)=>{
   const t = req.params.table;
-  if(['products','settings'].includes(t)) return res.status(400).json({error:'use specific'});
+  if(['products','settings','orders','reviews','feedback','feedbacks','signup','login'].includes(t)) return res.status(400).json({error:'use specific'});
   const {data, error} = await supabase.from(t).insert(req.body).select().single();
   res.json(data||{error});
 });
@@ -70,42 +139,17 @@ app.post('/api/settings', async (req,res)=>{
   res.json(data);
 });
 
-// --- Admin.html er jonno missing API ---
-
-// 1. Admin Login Check
+// --- ADMIN ---
 app.post('/api/check-admin', async (req,res)=>{
   const s = await getSettings();
   const key = s.adminKey || 'admin123';
   res.json({ok: req.body.key === key});
 });
-
-// 2. Admin ja chay - alada alada data
-app.get('/api/products', async (req,res)=>{
-  const products = await getTable('products');
-  res.json(products.map(p=>({
-    id:p.id, name:p.name, cat:p.cat||'Fashion', price:p.price||0, old:p.old||0, stock:p.stock||0,
-    rating:p.rating||4.8, badge:p.badge||'', emoji:p.emoji||'📦',
-    desc:p.description||'', images:p.images||[], variants:p.variants||[]
-  })));
-});
-app.get('/api/faqs', async (req,res)=> res.json(await getTable('faqs')));
-app.get('/api/settings', async (req,res)=> res.json(await getSettings()));
-
-// 3. Admin Orders - Shop er format e
-app.get('/api/admin/orders', async (req,res)=>{
-  const orders = await getTable('orders');
-  res.json(orders.map(o=>({
-    id:o.id, orderId:o.orderid||('ORD-'+o.id), name:o.customer_name||o.name, phone:o.customer_phone||o.phone,
-    address:o.shipping_address||o.address, items:o.items, total:o.total_amount||o.total||0,
-    status:o.status||'Pending', date:o.created_at||o.date, payment:o.payment_method||o.payment, trxid:o.trxid
-  })));
-});
+app.get('/api/admin/orders', async (req,res)=>{ const o=await getTable('orders'); res.json(o.map(mapOrder)); });
 app.get('/api/admin/feedbacks', async (req,res)=> res.json(await getTable('feedbacks')));
-
-// 4. Admin Product Save / Update / Delete
 app.post('/api/admin/products', async (req,res)=>{
   const b=req.body;
-  const row={name:b.name, cat:b.cat||'Fashion', price:b.price||0, old:b.old||0, stock:b.stock||0, rating:b.rating||4.8, badge:b.badge||'', emoji:b.emoji||'📦', description:b.desc||'', images:b.images||[], variants:b.variants||[]};
+  const row={name:b.name, cat:b.cat||'Fashion', price:b.price||0, old:b.old||0, stock:b.stock||0, rating:b.rating||4.8, badge:b.badge||'', emoji:b.emoji||'📦', description:b.desc||b.description||'', images:b.images||[], variants:b.variants||[]};
   const {data}=await supabase.from('products').insert(row).select().single();
   res.json(data||{ok:true});
 });
@@ -116,23 +160,10 @@ app.put('/api/admin/products/:id', async (req,res)=>{
   await supabase.from('products').update(row).eq('id',req.params.id);
   res.json({ok:true});
 });
-app.delete('/api/admin/products/:id', async (req,res)=>{
-  await supabase.from('products').delete().eq('id',req.params.id); res.json({ok:true});
-});
-
-// 5. Admin Order Update / Delete
-app.put('/api/admin/orders/:id', async (req,res)=>{
-  await supabase.from('orders').update({status:req.body.status}).eq('id',req.params.id);
-  res.json({ok:true});
-});
-app.delete('/api/admin/orders/:id', async (req,res)=>{
-  await supabase.from('orders').delete().eq('id',req.params.id); res.json({ok:true});
-});
-app.delete('/api/admin/feedbacks/:id', async (req,res)=>{
-  await supabase.from('feedbacks').delete().eq('id',req.params.id); res.json({ok:true});
-});
-
-// 6. Admin Settings Save - ager settings er sathe merge
+app.delete('/api/admin/products/:id', async (req,res)=>{ await supabase.from('products').delete().eq('id',req.params.id); res.json({ok:true}); });
+app.put('/api/admin/orders/:id', async (req,res)=>{ await supabase.from('orders').update({status:req.body.status}).eq('id',req.params.id); res.json({ok:true}); });
+app.delete('/api/admin/orders/:id', async (req,res)=>{ await supabase.from('orders').delete().eq('id',req.params.id); res.json({ok:true}); });
+app.delete('/api/admin/feedbacks/:id', async (req,res)=>{ await supabase.from('feedbacks').delete().eq('id',req.params.id); res.json({ok:true}); });
 app.post('/api/admin/settings', async (req,res)=>{
   const old = await getSettings();
   const merged = {...old, ...req.body};
@@ -140,7 +171,7 @@ app.post('/api/admin/settings', async (req,res)=>{
   res.json(data);
 });
 
-// --- Website Serve - Shop Alada, Admin Alada --- 
+// --- Website Serve ---
 function getIndexPath(){
   if(fs.existsSync(path.join(__dirname,'index.html'))) return path.join(__dirname,'index.html');
   if(fs.existsSync(path.join(__dirname,'public','index.html'))) return path.join(__dirname,'public','index.html');
@@ -151,15 +182,7 @@ function getAdminPath(){
   if(fs.existsSync(path.join(__dirname,'public','admin.html'))) return path.join(__dirname,'public','admin.html');
   return path.join(__dirname,'admin.html');
 }
-
-app.get('/debug', (req,res)=> {
-  res.json({ 
-    files: fs.readdirSync(__dirname), 
-    has_index_root: fs.existsSync(path.join(__dirname,'index.html')),
-    has_admin: fs.existsSync(path.join(__dirname,'admin.html'))
-  });
-});
-
+app.get('/debug', (req,res)=> res.json({ files: fs.readdirSync(__dirname), has_index_root: fs.existsSync(path.join(__dirname,'index.html')), has_admin: fs.existsSync(path.join(__dirname,'admin.html')) }));
 app.get('/admin', (req,res)=> res.sendFile(getAdminPath()));
 app.get('/admin.html', (req,res)=> res.sendFile(getAdminPath()));
 app.get('/', (req,res)=> res.sendFile(getIndexPath()));
@@ -167,6 +190,5 @@ app.get('*', (req,res)=> {
   if(req.path.startsWith('/api/')) return res.status(404).json({error:'Not Found'});
   res.sendFile(getIndexPath());
 });
-
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, ()=> console.log('Running on '+PORT));
