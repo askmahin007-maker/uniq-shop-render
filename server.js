@@ -18,8 +18,21 @@ async function getSettings(){
   const {data} = await supabase.from('settings').select('*').eq('id',1).single();
   return data?.data || {};
 }
+async function saveSettings(newData){
+  const old = await getSettings();
+  const merged = {...old, ...newData};
+  // === PASSWORD FIX - je kono nam e aslei adminKey te save hobe ===
+  if(newData.adminKey) merged.adminKey = newData.adminKey;
+  if(newData.adminPass) merged.adminKey = newData.adminPass;
+  if(newData.password) merged.adminKey = newData.password;
+  if(newData.adminPassword) merged.adminKey = newData.adminPassword;
+  // sob nam e same rakhi jate pore konotai miss na hoy
+  if(merged.adminKey){ merged.adminPass = merged.adminKey; merged.password = merged.adminKey; }
+  const {data} = await supabase.from('settings').upsert({id:1, data:merged}).select().single();
+  return merged;
+}
 function cleanPhone(p){ let c=String(p||'').replace(/[^0-9]/g,''); return c; }
-function mapProduct(p){ return { id:p.id, name:p.name||'Product', cat:p.cat||'Fashion', price:p.price||0, old:p.old||0, stock:p.stock||0, rating:p.rating||4.8, badge:p.badge||'', emoji:p.emoji||'📦', desc:p.description||p.desc||'', images:p.images||[], variants:p.variants||[] }; }
+function mapProduct(p){ return { id:p.id, name:p.name||'Product', cat:p.cat||'Fashion', price:p.price||0, old:p.old||0, stock:p.stock||0, rating:p.rating||4.8, badge:p.badge||'', emoji:p.emoji||'📦', desc:p.description||p.desc||'', description:p.description||p.desc||'', images:p.images||[], variants:p.variants||[], loc:p.loc||p.location||'Dhaka', location:p.loc||p.location||'Dhaka', cond:p.cond||p.condition||'New', condition:p.cond||p.condition||'New' }; }
 function mapOrder(o){ return { id:o.id, orderId:o.orderid||o.orderId||('ORD-'+o.id), name:o.customer_name||o.name||'', phone:o.customer_phone||o.phone||'', address:o.shipping_address||o.address||'', items:o.items||'', total:o.total_amount||o.total||0, status:o.status||'Pending', date:o.created_at||o.date||'', payment:o.payment_method||o.payment||'COD', trxid:o.trxid||o.trxId||'', trxId:o.trxid||o.trxId||'' }; }
 
 // --- SHOP DATA ---
@@ -38,7 +51,7 @@ app.get('/api/data', async (req,res)=>{
 app.get('/api/products', async (req,res)=>{ const p=await getTable('products'); res.json(p.map(mapProduct)); });
 app.post('/api/products', async (req,res)=>{
   const b = req.body;
-  const row = { name:b.name, cat:b.cat||'Fashion', price:b.price||0, old:b.old||0, stock:b.stock||0, rating:b.rating||4.8, badge:b.badge||'', emoji:b.emoji||'📦', description:b.desc||b.description||'', images:b.images||[], variants:b.variants||[] };
+  const row = { name:b.name, cat:b.cat||'Fashion', price:b.price||0, old:b.old||0, stock:b.stock||0, rating:b.rating||4.8, badge:b.badge||'', emoji:b.emoji||'📦', description:b.desc||b.description||'', images:b.images||[], variants:b.variants||[], loc:b.loc||b.location||'Dhaka', cond:b.cond||b.condition||'New' };
   let r;
   if(b.id){ r = await supabase.from('products').update(row).eq('id',b.id).select().single(); }
   else{ r = await supabase.from('products').insert(row).select().single(); }
@@ -51,7 +64,7 @@ app.get('/api/faqs', async (req,res)=> res.json(await getTable('faqs')));
 app.get('/api/settings', async (req,res)=> res.json(await getSettings()));
 app.get('/api/reviews', async (req,res)=> res.json(await getTable('reviews')));
 
-// --- SHOP: ORDERS - Frontend ja chay tai dibe ---
+// --- SHOP: ORDERS ---
 app.post('/api/orders', async (req,res)=>{
   try{
     const b=req.body;
@@ -107,7 +120,7 @@ app.get('/api/track-order', async (req,res)=>{
   res.json({ok:true, order:mapOrder(o)});
 });
 
-// --- SHOP: Feedback (singular + plural 2 tai) / Stock Alert ---
+// --- SHOP: Feedback / Stock Alert ---
 app.post('/api/feedback', async (req,res)=>{
   const b=req.body;
   const {data}=await supabase.from('feedbacks').insert({name:b.name||'Guest', text:b.text||'', rating:5}).select().single();
@@ -123,7 +136,7 @@ app.post('/api/stock-alert', async (req,res)=>{
   res.json({ok:true, alert:data});
 });
 
-// --- Generic (baki table er jonno) ---
+// --- Generic ---
 app.post('/api/:table', async (req,res)=>{
   const t = req.params.table;
   if(['products','settings','orders','reviews','feedback','feedbacks','signup','login'].includes(t)) return res.status(400).json({error:'use specific'});
@@ -135,40 +148,54 @@ app.delete('/api/:table/:id', async (req,res)=>{
   res.json({ok:true});
 });
 app.post('/api/settings', async (req,res)=>{
-  const {data} = await supabase.from('settings').upsert({id:1, data:req.body}).select().single();
-  res.json(data);
+  const merged = await saveSettings(req.body);
+  res.json(merged);
 });
 
-// --- ADMIN ---
+// --- ADMIN - FIXED ---
 app.post('/api/check-admin', async (req,res)=>{
   const s = await getSettings();
-  const key = s.adminKey || 'admin123';
-  res.json({ok: req.body.key === key});
+  // FIX: sob nam theke password khujbe
+  const saved = s.adminKey || s.adminPass || s.password || s.adminPassword || 'admin123';
+  const incoming = req.body.key || req.body.adminKey || req.body.adminPass || req.body.password || '';
+  res.json({ok: String(incoming).trim() === String(saved).trim()});
 });
 app.get('/api/admin/orders', async (req,res)=>{ const o=await getTable('orders'); res.json(o.map(mapOrder)); });
 app.get('/api/admin/feedbacks', async (req,res)=> res.json(await getTable('feedbacks')));
 app.post('/api/admin/products', async (req,res)=>{
   const b=req.body;
-  const row={name:b.name, cat:b.cat||'Fashion', price:b.price||0, old:b.old||0, stock:b.stock||0, rating:b.rating||4.8, badge:b.badge||'', emoji:b.emoji||'📦', description:b.desc||b.description||'', images:b.images||[], variants:b.variants||[]};
+  const row={name:b.name, cat:b.cat||'Fashion', price:b.price||0, old:b.old||0, stock:b.stock||0, rating:b.rating||4.8, badge:b.badge||'', emoji:b.emoji||'📦', description:b.desc||b.description||'', images:b.images||[], variants:b.variants||[], loc:b.loc||b.location||'Dhaka', cond:b.cond||b.condition||'New'};
   const {data}=await supabase.from('products').insert(row).select().single();
   res.json(data||{ok:true});
 });
+// FIXED: Product Edit e sob field update hobe - Variant / Image / Badge harabe na!
 app.put('/api/admin/products/:id', async (req,res)=>{
   const b=req.body; const row={};
-  if(b.name) row.name=b.name; if(b.price!==undefined) row.price=b.price; if(b.stock!==undefined) row.stock=b.stock;
-  if(b.cat) row.cat=b.cat; if(b.desc!==undefined) row.description=b.desc;
-  await supabase.from('products').update(row).eq('id',req.params.id);
-  res.json({ok:true});
+  if(b.name!==undefined) row.name=b.name;
+  if(b.price!==undefined) row.price=b.price;
+  if(b.old!==undefined) row.old=b.old;
+  if(b.stock!==undefined) row.stock=b.stock;
+  if(b.cat!==undefined) row.cat=b.cat;
+  if(b.badge!==undefined) row.badge=b.badge;
+  if(b.emoji!==undefined) row.emoji=b.emoji;
+  if(b.desc!==undefined || b.description!==undefined) row.description=b.desc||b.description;
+  if(b.images!==undefined) row.images=b.images;
+  if(b.variants!==undefined) row.variants=b.variants;
+  if(b.loc!==undefined || b.location!==undefined) row.loc=b.loc||b.location;
+  if(b.cond!==undefined || b.condition!==undefined) row.cond=b.cond||b.condition;
+  if(b.rating!==undefined) row.rating=b.rating;
+  const {data,error}=await supabase.from('products').update(row).eq('id',req.params.id).select().single();
+  if(error) return res.json({ok:false,msg:error.message});
+  res.json({ok:true, data});
 });
 app.delete('/api/admin/products/:id', async (req,res)=>{ await supabase.from('products').delete().eq('id',req.params.id); res.json({ok:true}); });
 app.put('/api/admin/orders/:id', async (req,res)=>{ await supabase.from('orders').update({status:req.body.status}).eq('id',req.params.id); res.json({ok:true}); });
 app.delete('/api/admin/orders/:id', async (req,res)=>{ await supabase.from('orders').delete().eq('id',req.params.id); res.json({ok:true}); });
 app.delete('/api/admin/feedbacks/:id', async (req,res)=>{ await supabase.from('feedbacks').delete().eq('id',req.params.id); res.json({ok:true}); });
+// FIXED: Settings e Password + sob kichu thik moto merge hobe
 app.post('/api/admin/settings', async (req,res)=>{
-  const old = await getSettings();
-  const merged = {...old, ...req.body};
-  const {data} = await supabase.from('settings').upsert({id:1, data:merged}).select().single();
-  res.json(data);
+  const merged = await saveSettings(req.body);
+  res.json({ok:true, data:merged});
 });
 
 // --- Website Serve ---
